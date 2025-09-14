@@ -1,0 +1,33 @@
+flowchart TD
+    %% Onboarding & Setup
+    A[User Registers / Logs In] --> B[JWT issued with businessType]
+    B --> C[Frontend Loads Config via businessType]
+    C -->|Pharmacy| D1[Render Pharmacy UI<br/>Fields: Batch No, Expiry Date<br/>Theme: Green]
+    C -->|Restaurant| D2[Render Restaurant UI<br/>Fields: Recipe Mapping<br/>Theme: Orange]
+    C -->|Rental| D3[Render Rental UI<br/>Fields: Contract, Asset Condition<br/>Theme: Blue]
+    C -->|Retail| D4[Render Retail UI<br/>Fields: Variants, Warranty<br/>Theme: Gray]
+
+    %% Sale Flow
+    D1 --> E[User Initiates Sale]
+    D2 --> E
+    D3 --> E
+    D4 --> E
+
+    E --> F[Frontend sends API call /sale with JWT]
+    F --> G[Backend: authMiddleware extracts businessType]
+    G --> H[inventoryWorkflowMiddleware picks workflows]
+
+    %% Backend Workflow Branches
+    H -->|Pharmacy| I1[Run expiry alerts + deduct by batch<br/>Log prescription]
+    H -->|Restaurant| I2[Deduct ingredients via recipe<br/>Forecast runout]
+    H -->|Rental| I3[Mark asset unavailable<br/>Create rental contract<br/>Overdue alerts]
+    H -->|Retail| I4[Deduct stock by SKU variant<br/>Register warranty<br/>Enable return/exchange]
+
+    %% Final Response
+    I1 --> J[Unified Inventory Engine Updates DB]
+    I2 --> J
+    I3 --> J
+    I4 --> J
+
+    J --> K[Backend responds with tailored logic applied]
+    K --> L[Frontend UI shows tailored confirmation]

@@ -1,0 +1,20 @@
+name,description,barcode,sku,type,category,price,costPrice,stockQty,minStockLevel,supplier,location,isActive
+Apple iPhone 15 Pro,Latest iPhone with advanced features,1234567890123,IPH15P-128,unit,electronics,999.99,850.00,50,10,Apple Inc,Aisle 3 Shelf 2,true
+Samsung Galaxy S24 Ultra,Flagship Android smartphone,9876543210987,SGS24U-256,unit,electronics,1199.99,1000.00,30,8,Samsung,Aisle 3 Shelf 1,true
+Dell XPS 13 Laptop,Ultra-portable business laptop,4567890123456,DXPS13-16,unit,electronics,1299.99,1100.00,20,5,Dell,Aisle 4 Shelf 1,true
+Nike Air Max 270,Sports running shoes,7890123456789,AM270-10,pack,footwear,150.00,100.00,100,20,Nike,Aisle 1 Shelf 3,true
+Adidas Ultraboost 22,Comfortable running shoes,3210987654321,UB22-9,pack,footwear,180.00,120.00,80,15,Adidas,Aisle 1 Shelf 4,true
+Coca-Cola Classic,Original cola drink,6543210987654,CC-12,pack,beverages,2.50,1.50,200,50,Coca-Cola,Aisle 2 Shelf 1,true
+Pepsi Cola,Refreshing cola beverage,2109876543210,PC-12,pack,beverages,2.25,1.25,150,40,Pepsi,Aisle 2 Shelf 2,true
+Whole Milk,1 gallon whole milk,5432109876543,WM-1G,unit,dairy,3.99,2.50,75,15,Dairy Farms,Aisle 5 Shelf 1,true
+Cheddar Cheese,Sharp cheddar cheese,8765432109876,CC-8OZ,unit,dairy,4.50,3.00,60,12,Cheese Co,Aisle 5 Shelf 2,true
+Fresh Bananas,Yellow bananas,1357924680135,FB-1LB,unit,produce,0.59,0.35,300,50,Fresh Farms,Produce Section,true
+Red Apples,Crisp red apples,2468013579246,RA-1LB,unit,produce,1.99,1.20,200,30,Fresh Farms,Produce Section,true
+White Bread,Sliced white bread,3692581470369,WB-20OZ,unit,bakery,2.99,1.80,120,25,Bakery Best,Aisle 6 Shelf 1,true
+Whole Wheat Bread,Whole wheat sliced bread,7418529630741,WWB-24OZ,unit,bakery,3.49,2.10,90,20,Bakery Best,Aisle 6 Shelf 2,true
+Ground Coffee,Medium roast ground coffee,8527419630852,GC-12OZ,unit,pantry,8.99,5.50,45,10,Coffee Co,Aisle 7 Shelf 1,true
+Tea Bags,Black tea bags,9638527410963,TB-100CT,pack,pantry,4.99,3.00,80,15,Tea Time,Aisle 7 Shelf 2,true
+Pasta Sauce,Marinara pasta sauce,1592637480159,PS-24OZ,unit,pantry,2.49,1.50,110,25,Pasta Plus,Aisle 8 Shelf 1,true
+Rice,Long grain white rice,7539518420753,R-5LB,unit,pantry,4.99,3.25,65,15,Rice Corp,Aisle 8 Shelf 2,true
+Frozen Pizza,Pepperoni frozen pizza,9517538420951,FP-12IN,unit,frozen,5.99,3.75,40,10,Frozen Foods,Aisle 9 Shelf 1,true
+Ice Cream,Vanilla ice cream,1472583690147,IC-1QT,unit,frozen,4.49,2.80,55,12,Ice Cream Co,Aisle 9 Shelf 2,true

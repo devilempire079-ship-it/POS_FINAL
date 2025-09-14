@@ -1,0 +1,6 @@
+flowchart TD
+    A[Step 1: Extend unifiedConfigs.ts] --> B[Step 2: Add Workflow Handlers in inventoryWorkflow.ts]
+    B --> C[Step 3: React UI Auto-Updates<br/>Fields + Theme + Categories]
+    C --> D[Step 4: Extend DB Schema if Needed<br/>(Prisma models like Appointment, Contract, etc.)]
+    D --> E[Step 5: Test Flow<br/>Login → JWT with new businessType → UI + Workflows run]
+    E --> F[✅ New Business Type Integrated]

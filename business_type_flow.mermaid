@@ -1,0 +1,23 @@
+sequenceDiagram
+    participant U as User
+    participant FE as Frontend (React)
+    participant BE as Backend (Express API)
+    participant DB as Database (Prisma/Postgres)
+
+    U->>FE: Login with email + password
+    FE->>BE: POST /auth/login
+    BE->>DB: Verify user credentials
+    DB-->>BE: User record with businessType
+    BE-->>FE: JWT { userId, businessType }
+
+    Note over FE: JWT stored in localStorage/session
+
+    U->>FE: Perform inventory action (e.g., Add Product)
+    FE->>BE: POST /inventory/add (with JWT in header)
+    BE->>BE: authMiddleware verifies token
+    BE->>BE: Extract businessType from JWT
+    BE->>BE: inventoryWorkflowMiddleware applies workflows
+    BE->>DB: Insert/update product with metadata
+    DB-->>BE: Save confirmation
+    BE-->>FE: Response with businessType-tailored logic applied
+    FE-->>U: Render tailored inventory UI (pharmacy, restaurant, rental, retail)

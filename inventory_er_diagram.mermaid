@@ -1,0 +1,82 @@
+erDiagram
+    USER {
+        string id PK
+        string email
+        string password
+        string name
+        string businessType
+    }
+
+    PRODUCT {
+        string id PK
+        string name
+        string sku
+        float price
+        int stockQty
+        string category
+        json metadata  // industry-specific fields (expiry, recipe, contract, variants)
+    }
+
+    SUPPLIER {
+        string id PK
+        string name
+        string contactInfo
+    }
+
+    STOCK_MOVEMENT {
+        string id PK
+        string productId FK
+        string type  // IN, OUT, ADJUSTMENT
+        int quantity
+        datetime timestamp
+        string referenceId  // order, contract, prescription
+    }
+
+    ORDER {
+        string id PK
+        string userId FK
+        datetime date
+        float total
+        string status
+    }
+
+    PRESCRIPTION {
+        string id PK
+        string productId FK
+        string doctorName
+        string patientName
+        date expiryDate
+    }
+
+    RECIPE {
+        string id PK
+        string menuItem
+        json ingredients  // links ingredients to products
+    }
+
+    RENTAL_CONTRACT {
+        string id PK
+        string productId FK
+        string customerName
+        date startDate
+        date endDate
+        string status  // active, overdue, returned
+    }
+
+    WARRANTY {
+        string id PK
+        string productId FK
+        date startDate
+        date endDate
+        string status
+    }
+
+    %% Relationships
+    PRODUCT ||--o{ SUPPLIER : "supplied_by"
+    PRODUCT ||--o{ STOCK_MOVEMENT : "has_movements"
+    PRODUCT ||--o{ PRESCRIPTION : "pharmacy_only"
+    PRODUCT ||--o{ RECIPE : "restaurant_only"
+    PRODUCT ||--o{ RENTAL_CONTRACT : "rental_only"
+    PRODUCT ||--o{ WARRANTY : "retail_only"
+    USER ||--o{ ORDER : "places"
+    ORDER ||--o{ STOCK_MOVEMENT : "generates"

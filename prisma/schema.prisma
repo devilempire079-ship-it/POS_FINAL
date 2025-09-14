@@ -1,0 +1,1136 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id          Int      @id @default(autoincrement())
+  name        String
+  email       String?  @unique
+  password    String   // bcrypt hashed
+  businessType String   @default("retail") // pharmacy | restaurant | rental | retail
+  role        String   // admin, manager, cashier, custom
+  isActive    Boolean  @default(true)
+  lastLogin   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  sales       Sale[]
+  logs        Log[]
+  stockMovements StockMovement[]
+  permissions UserPermission[]
+  permissionTemplateId Int?
+  permissionTemplate PermissionTemplate? @relation(fields: [permissionTemplateId], references: [id])
+}
+
+model PermissionTemplate {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?
+  isDefault   Boolean  @default(false)
+  isSystem    Boolean  @default(false) // system templates can't be deleted
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  users       User[]
+  permissions TemplatePermission[]
+}
+
+model TemplatePermission {
+  id          Int      @id @default(autoincrement())
+  templateId  Int
+  template    PermissionTemplate @relation(fields: [templateId], references: [id])
+  resource    String   // customers, products, sales, inventory, reports, users, settings
+  action      String   // view, create, edit, delete, export
+  field       String?  // specific field name, null for general permission
+  allowed     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@unique([templateId, resource, action, field])
+}
+
+model UserPermission {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  resource  String   // customers, products, sales, inventory, reports, users, settings
+  action    String   // view, create, edit, delete, export
+  field     String?  // specific field name, null for general permission
+  allowed   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, resource, action, field])
+}
+
+model Product {
+  id                  Int        @id @default(autoincrement())
+  name                String
+  description         String?
+  barcode             String?    @unique
+  sku                 String?    @unique
+  type                String     @default("unit")
+  metadata            Json?      // business-type specific attributes
+  category            String?
+  cost                Float
+  price               Float
+  stockQty            Float      @default(0)
+  minStockLevel       Float      @default(10)
+  expiryDate          DateTime?
+  location            String?
+  supplier            String?
+  supplierId          Int?
+  Supplier            Supplier?  @relation(fields: [supplierId], references: [id])
+  warehouseLocation   String?
+  reorderPoint        Float?     @default(10)
+  idealStock          Float?
+  lastRestocked       DateTime?
+  isActive            Boolean    @default(true)
+  conversionRate      Float      @default(1.0)   // for packs/wholesale
+  unitOfMeasure       String     @default("each") // kg, g, lb, oz, L, mL, etc.
+  minOrderQty         Float      @default(1.0)   // minimum quantity that can be sold
+  alternateUnit       String?                    // alternate unit of measure (e.g., feet)
+  alternateUnitConversionRate Float  @default(1.0) // conversion rate from primary to alternate unit
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  // PHARMACY-SPECIFIC FIELDS
+  drugClassifications String?    // JSON: therapeutic class, AHFS class, etc.
+  controlledSchedule  String?    // DEA schedule (I, II, III, IV, V)
+  deaCode            String?     // DEA registration number for controlled substances
+  saleItems           SaleItem[]
+  stockMovements      StockMovement[]
+  purchaseOrderItems  PurchaseOrderItem[]
+  purchaseReceiptItems PurchaseReceiptItem[]
+  inventoryAdjustments InventoryAdjustment[]
+  warehouseLocationRef WarehouseLocation? @relation(fields: [warehouseLocationId], references: [id])
+  warehouseLocationId Int?
+
+  // WORLD-CLASS RELATIONS
+  locationInventory   LocationInventory[]
+  transferItems       TransferItem[]
+  locationAllocations LocationAllocation[]
+  inventoryType       InventoryType? @relation(fields: [inventoryTypeId], references: [id])
+  inventoryTypeId     Int?
+  demandForecasts     DemandForecast[]
+  inventoryOptimizations InventoryOptimization[]
+  qualityControls     QualityControl[]
+  complianceRecords   ComplianceRecord[]
+  regulatoryTracking  RegulatoryTracking[]
+  inventoryAnalytics  InventoryAnalytics[]
+  inventoryAlerts     InventoryAlert[]
+  supplyChainRisks    SupplyChainRisk[]
+
+  // PHARMACY RELATIONS
+  prescriptions       Prescriptions[]
+}
+
+model Sale {
+  id           Int        @id @default(autoincrement())
+  date         DateTime   @default(now())
+  totalAmount  Float
+  subtotal     Float
+  taxAmount    Float      @default(0)
+  discount     Float      @default(0)
+  paymentType  String
+  paymentRef   String?
+  status       String     @default("completed")
+  notes        String?
+  cashierId    Int
+  cashier      User       @relation(fields: [cashierId], references: [id])
+  customerId   Int?
+  customer     Customer?  @relation(fields: [customerId], references: [id])
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  saleItems    SaleItem[]
+  loyaltyTransactions LoyaltyTransaction[]
+}
+
+model SaleItem {
+  id        Int     @id @default(autoincrement())
+  saleId    Int
+  sale      Sale    @relation(fields: [saleId], references: [id])
+  productId Int
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Float
+  unitPrice Float
+  totalPrice Float
+  discount  Float   @default(0)
+
+  // // Pharmacy relations - added as optional foreign key in prescription fill logic
+}
+
+model StockMovement {
+  id          Int      @id @default(autoincrement())
+  productId   Int
+  product     Product  @relation(fields: [productId], references: [id])
+  type        String   // in, out, adjustment
+  quantity    Float
+  reason      String?
+  reference   String?
+  userId      Int?
+  user        User?    @relation(fields: [userId], references: [id])
+  notes       String?
+  createdAt   DateTime @default(now())
+}
+
+model Log {
+  id        Int      @id @default(autoincrement())
+  userId    Int?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  resource  String?
+  resourceId String?
+  details   String?
+  ipAddress String?
+  userAgent String?
+  timestamp DateTime @default(now())
+
+  // Pharmacy relations
+  pharmacistVerifications PharmacistVerifications[]
+}
+
+model Customer {
+  id           Int         @id @default(autoincrement())
+  firstName    String
+  lastName     String
+  email        String?     @unique
+  phone        String?
+  dateOfBirth  DateTime?
+  address      String?
+  city         String?
+  state        String?
+  zipCode      String?
+  country      String?     @default("US")
+
+  // Loyalty & Analytics
+  loyaltyPoints    Int        @default(0)
+  loyaltyTierId    Int?       // Proper foreign key to LoyaltyTier
+  pointsMultiplier Float      @default(1.0)
+  totalSpent       Float      @default(0)
+  totalOrders      Int        @default(0)
+  lastVisit        DateTime?
+  averageOrderValue Float     @default(0)
+
+  // Preferences & Segmentation
+  preferredPaymentMethod String?
+  customerType          String?  // regular, vip, wholesale
+  marketingOptIn       Boolean  @default(false)
+  notes                 String?
+
+  // Status & Lifecycle
+  status               String   @default("active") // active, inactive, blocked
+  registrationDate     DateTime @default(now())
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  // PHARMACY-SPECIFIC FIELDS
+  medicalHistory       String?  // JSON medical conditions and history
+  consentSettings      String?  // JSON consent preferences (SMS, email, marketing)
+
+  // Relations
+  sales               Sale[]
+  loyaltyTransactions LoyaltyTransaction[]
+  communications      Communication[]
+  loyaltyTier         LoyaltyTier? @relation(fields: [loyaltyTierId], references: [id])
+
+  // Pharmacy Relations
+  patientMedicalProfiles PatientMedicalProfiles[]
+  prescriptions         Prescriptions[]
+}
+
+model LoyaltyTransaction {
+  id         Int      @id @default(autoincrement())
+  customerId Int
+  customer   Customer @relation(fields: [customerId], references: [id])
+  type       String   // earned, redeemed, bonus, adjustment
+  points     Int
+  reason     String
+  saleId     Int?     // Link to sale if earned from purchase
+  sale       Sale?    @relation(fields: [saleId], references: [id])
+  createdAt  DateTime @default(now())
+}
+
+model Communication {
+  id         Int      @id @default(autoincrement())
+  customerId Int
+  customer   Customer @relation(fields: [customerId], references: [id])
+  type       String   // email, sms, in_app
+  subject    String?
+  message    String
+  status     String   @default("sent") // sent, delivered, read, failed
+  sentAt     DateTime @default(now())
+  readAt     DateTime?
+}
+
+model Supplier {
+  id          Int      @id @default(autoincrement())
+  name        String
+  email       String?  @unique
+  phone       String?
+  address     String?
+  city        String?
+  state       String?
+  zipCode     String?
+  country     String?  @default("US")
+  contactPerson String?
+  paymentTerms String? // Net 30, Net 60, etc.
+  taxId       String?
+  notes       String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  products      Product[]
+  purchaseOrders PurchaseOrder[]
+  supplierPerformance SupplierPerformance[]
+  supplyChainRisks    SupplyChainRisk[]
+}
+
+model PurchaseOrder {
+  id            Int      @id @default(autoincrement())
+  orderNumber   String   @unique
+  supplierId    Int
+  supplier      Supplier @relation(fields: [supplierId], references: [id])
+  status        String   @default("draft") // draft, pending, approved, received, cancelled
+  orderDate     DateTime @default(now())
+  expectedDate  DateTime?
+  receivedDate  DateTime?
+  totalAmount   Float    @default(0)
+  taxAmount     Float    @default(0)
+  discount      Float    @default(0)
+  notes         String?
+  createdBy     Int
+  approvedBy    Int?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  items         PurchaseOrderItem[]
+  receipts      PurchaseReceipt[]
+}
+
+model PurchaseOrderItem {
+  id               Int      @id @default(autoincrement())
+  purchaseOrderId  Int
+  purchaseOrder    PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  productId        Int
+  product          Product  @relation(fields: [productId], references: [id])
+  quantity         Float
+  unitCost         Float
+  totalCost        Float
+  receivedQuantity Float    @default(0)
+  status           String   @default("pending") // pending, partial, received
+  createdAt        DateTime @default(now())
+}
+
+model PurchaseReceipt {
+  id               Int      @id @default(autoincrement())
+  purchaseOrderId  Int
+  purchaseOrder    PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  receiptNumber    String  @unique
+  receivedDate     DateTime @default(now())
+  receivedBy       Int
+  totalReceived    Float
+  totalCost        Float
+  notes            String?
+  createdAt        DateTime @default(now())
+
+  // Relations
+  items            PurchaseReceiptItem[]
+}
+
+model PurchaseReceiptItem {
+  id               Int      @id @default(autoincrement())
+  purchaseReceiptId Int
+  purchaseReceipt  PurchaseReceipt @relation(fields: [purchaseReceiptId], references: [id])
+  productId        Int
+  product          Product @relation(fields: [productId], references: [id])
+  orderedQuantity  Float
+  receivedQuantity Float
+  unitCost         Float
+  totalCost        Float
+  condition        String  @default("good") // good, damaged, expired
+  expiryDate       DateTime?
+  notes            String?
+  createdAt        DateTime @default(now())
+}
+
+model InventoryAdjustment {
+  id            Int      @id @default(autoincrement())
+  productId     Int
+  product       Product  @relation(fields: [productId], references: [id])
+  adjustmentType String  // increase, decrease, set
+  oldQuantity   Float
+  newQuantity   Float
+  difference    Float
+  reason        String
+  reference     String?  // PO number, sale ID, etc.
+  performedBy   Int
+  approvedBy    Int?
+  notes         String?
+  createdAt     DateTime @default(now())
+}
+
+model Warehouse {
+  id          Int      @id @default(autoincrement())
+  name        String
+  code        String   @unique
+  address     String?
+  city        String?
+  state       String?
+  zipCode     String?
+  country     String?  @default("US")
+  manager     String?
+  phone       String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  locations   WarehouseLocation[]
+}
+
+model WarehouseLocation {
+  id          Int      @id @default(autoincrement())
+  warehouseId Int
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
+  aisle       String
+  shelf       String
+  bin         String
+  locationCode String  @unique
+  maxCapacity Float?
+  currentLoad Float    @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  // Relations
+  products    Product[]
+}
+
+// WORLD-CLASS MULTI-LOCATION INTELLIGENCE SYSTEM
+model Location {
+  id          Int      @id @default(autoincrement())
+  code        String   @unique
+  name        String
+  type        String   // warehouse, store, production, field, supplier, dropship, fulfillment
+  address     String?
+  city        String?
+  state       String?
+  zipCode     String?
+  country     String?  @default("US")
+  latitude    Float?
+  longitude   Float?
+  manager     String?
+  phone       String?
+  email       String?
+  isActive    Boolean  @default(true)
+  priority    Int      @default(0) // for allocation priority
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  inventory   LocationInventory[]
+  transfers   InventoryTransfer[] @relation("FromLocation")
+  transfersIn InventoryTransfer[] @relation("ToLocation")
+  allocations LocationAllocation[]
+  demandForecasts DemandForecast[]
+  inventoryOptimizations InventoryOptimization[]
+  inventoryAnalytics InventoryAnalytics[]
+  inventoryAlerts InventoryAlert[]
+}
+
+model LocationInventory {
+  id          Int      @id @default(autoincrement())
+  locationId  Int
+  location    Location @relation(fields: [locationId], references: [id])
+  productId   Int
+  product     Product  @relation(fields: [productId], references: [id])
+  quantity    Float    @default(0)
+  allocated   Float    @default(0) // allocated to orders
+  available   Float    @default(0) // quantity - allocated
+  minStock    Float    @default(0)
+  maxStock    Float?
+  reorderPoint Float   @default(0)
+  lastCount   DateTime?
+  lastMovement DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([locationId, productId])
+}
+
+model InventoryTransfer {
+  id          Int      @id @default(autoincrement())
+  transferNumber String @unique
+  fromLocationId Int
+  fromLocation Location @relation("FromLocation", fields: [fromLocationId], references: [id])
+  toLocationId Int
+  toLocation   Location @relation("ToLocation", fields: [toLocationId], references: [id])
+  status      String   @default("draft") // draft, approved, in_transit, received, cancelled
+  transferDate DateTime @default(now())
+  expectedDate DateTime?
+  receivedDate DateTime?
+  totalItems  Int      @default(0)
+  totalValue  Float    @default(0)
+  notes       String?
+  requestedBy Int
+  approvedBy  Int?
+  shippedBy   Int?
+  receivedBy  Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  items       TransferItem[]
+}
+
+model TransferItem {
+  id          Int      @id @default(autoincrement())
+  transferId  Int
+  transfer    InventoryTransfer @relation(fields: [transferId], references: [id])
+  productId   Int
+  product     Product  @relation(fields: [productId], references: [id])
+  quantity    Float
+  unitCost    Float
+  totalValue  Float
+  shippedQty  Float    @default(0)
+  receivedQty Float    @default(0)
+  condition   String   @default("good") // good, damaged, expired
+  notes       String?
+  createdAt   DateTime @default(now())
+}
+
+model LocationAllocation {
+  id          Int      @id @default(autoincrement())
+  locationId  Int
+  location    Location @relation(fields: [locationId], references: [id])
+  productId   Int
+  product     Product  @relation(fields: [productId], references: [id])
+  orderId     String   // sale ID, transfer ID, etc.
+  orderType   String   // sale, transfer, production, etc.
+  quantity    Float
+  allocatedAt DateTime @default(now())
+  expiresAt   DateTime? // when allocation expires
+  status      String   @default("active") // active, fulfilled, expired, cancelled
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model LoyaltyTier {
+  id              Int      @id @default(autoincrement())
+  name            String   @unique
+  minPoints       Int
+  pointsMultiplier Float   @default(1.0)
+  benefits        String?
+  color           String?  @default("#cccccc")
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  customers       Customer[]
+}
+
+// WORLD-CLASS BUSINESS TYPE MANAGEMENT
+model BusinessType {
+  id          Int      @id @default(autoincrement())
+  code        String   @unique // retail, restaurant, manufacturing, healthcare, construction, automotive, hospitality, e_commerce, education, warehouse, agriculture, pharmaceutical
+  name        String
+  description String?
+  icon        String?  // emoji or icon identifier
+  category    String?  // retail, manufacturing, service, healthcare, education, agriculture
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  settings      BusinessTypeSetting[]
+  storeSettings StoreSettings[]
+  inventoryRules InventoryBusinessRules[]
+  workflows     BusinessWorkflow[]
+  compliance    BusinessCompliance[]
+  inventoryScenarios InventoryScenario[]
+}
+
+model BusinessTypeSetting {
+  id            Int         @id @default(autoincrement())
+  businessTypeId Int
+  businessType  BusinessType @relation(fields: [businessTypeId], references: [id])
+  key           String      // tax_rate, currency, features, etc.
+  value         String
+  valueType     String      @default("string") // string, number, boolean, json
+  description   String?
+  isRequired    Boolean     @default(false)
+  validation    String?     // JSON validation rules
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([businessTypeId, key])
+}
+
+// WORLD-CLASS INVENTORY BUSINESS RULES
+model InventoryBusinessRules {
+  id            Int         @id @default(autoincrement())
+  businessTypeId Int
+  businessType  BusinessType @relation(fields: [businessTypeId], references: [id])
+  ruleType      String      // fifo, lifo, weighted_average, specific_identification
+  ruleName      String
+  description   String?
+  isActive      Boolean     @default(true)
+  priority      Int         @default(0)
+  conditions    String?     // JSON conditions for rule application
+  actions       String?     // JSON actions to take
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+// WORLD-CLASS BUSINESS WORKFLOWS
+model BusinessWorkflow {
+  id            Int         @id @default(autoincrement())
+  businessTypeId Int
+  businessType  BusinessType @relation(fields: [businessTypeId], references: [id])
+  workflowType  String      // purchase_order, receiving, stock_adjustment, quality_control
+  name          String
+  description   String?
+  steps         String      // JSON workflow steps
+  isActive      Boolean     @default(true)
+  approvalRequired Boolean  @default(false)
+  autoApproval  String?     // JSON auto-approval conditions
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+// WORLD-CLASS COMPLIANCE MANAGEMENT
+model BusinessCompliance {
+  id            Int         @id @default(autoincrement())
+  businessTypeId Int
+  businessType  BusinessType @relation(fields: [businessTypeId], references: [id])
+  regulation    String      // FDA, EPA, OSHA, ISO, HACCP, etc.
+  requirement   String
+  description   String?
+  isMandatory   Boolean     @default(false)
+  frequency     String?     // daily, weekly, monthly, quarterly, annually
+  lastAudit     DateTime?
+  nextAudit     DateTime?
+  status        String      @default("pending") // compliant, non_compliant, pending
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+// WORLD-CLASS ADVANCED INVENTORY TYPES
+model InventoryType {
+  id          Int      @id @default(autoincrement())
+  code        String   @unique
+  name        String
+  category    String   // physical_goods, digital_assets, services, assets, intangible, loaned, regulated, tracked
+  description String?
+  icon        String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  products    Product[]
+  rules       InventoryTypeRule[]
+}
+
+model InventoryTypeRule {
+  id            Int         @id @default(autoincrement())
+  inventoryTypeId Int
+  inventoryType InventoryType @relation(fields: [inventoryTypeId], references: [id])
+  ruleType      String      // valuation, tracking, expiration, allocation
+  ruleName      String
+  conditions    String?     // JSON conditions
+  actions       String?     // JSON actions
+  priority      Int         @default(0)
+  isActive      Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+// WORLD-CLASS PREDICTIVE INTELLIGENCE ENGINE
+model DemandForecast {
+  id          Int      @id @default(autoincrement())
+  productId   Int
+  product     Product  @relation(fields: [productId], references: [id])
+  locationId  Int?
+  location    Location? @relation(fields: [locationId], references: [id])
+  forecastDate DateTime
+  algorithm   String   // seasonal, trend, causal, collaborative
+  period      String   // daily, weekly, monthly, quarterly
+  predictedQty Float
+  confidence  Float    // 0-1 confidence score
+  actualQty   Float?   // filled after period ends
+  accuracy    Float?   // calculated accuracy
+  factors     String?  // JSON influencing factors
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model InventoryOptimization {
+  id          Int      @id @default(autoincrement())
+  productId   Int
+  product     Product  @relation(fields: [productId], references: [id])
+  locationId  Int?
+  location    Location? @relation(fields: [locationId], references: [id])
+  optimizationType String // reorder_point, safety_stock, economic_order_qty
+  currentValue Float
+  recommendedValue Float
+  savings     Float    // potential savings
+  priority    String   // high, medium, low
+  reasoning   String?  // explanation for recommendation
+  implemented Boolean  @default(false)
+  implementedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model InventoryScenario {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  businessTypeId Int
+  businessType BusinessType @relation(fields: [businessTypeId], references: [id])
+  scenarioType String // seasonal, promotional, supply_disruption, demand_spike
+  conditions  String  // JSON trigger conditions
+  actions     String  // JSON automated actions
+  isActive    Boolean @default(true)
+  priority    Int     @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// WORLD-CLASS QUALITY MANAGEMENT SYSTEM
+model QualityControl {
+  id          Int      @id @default(autoincrement())
+  productId   Int
+  product     Product  @relation(fields: [productId], references: [id])
+  batchLot    String?
+  serialNumber String?
+  inspectionType String // incoming, in_process, final, periodic
+  inspector   String?
+  status      String   @default("pending") // pass, fail, pending, quarantined
+  criteria    String?  // JSON inspection criteria
+  results     String?  // JSON inspection results
+  notes       String?
+  expiryDate  DateTime?
+  nextInspection DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  defects     QualityDefect[]
+}
+
+model QualityDefect {
+  id          Int      @id @default(autoincrement())
+  qualityControlId Int
+  qualityControl QualityControl @relation(fields: [qualityControlId], references: [id])
+  defectType  String
+  severity    String   // critical, major, minor
+  description String?
+  quantity    Float
+  disposition String?  // accept, reject, rework, scrap
+  cost        Float    @default(0)
+  createdAt   DateTime @default(now())
+}
+
+// WORLD-CLASS COMPLIANCE & REGULATORY TRACKING
+model ComplianceRecord {
+  id          Int      @id @default(autoincrement())
+  productId   Int?
+  product     Product? @relation(fields: [productId], references: [id])
+  regulation  String   // FDA, EPA, OSHA, ISO, HACCP, etc.
+  requirement String
+  status      String   @default("compliant") // compliant, non_compliant, pending
+  auditDate   DateTime?
+  nextAudit   DateTime?
+  auditor     String?
+  findings    String?  // JSON audit findings
+  correctiveActions String? // JSON required actions
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model RegulatoryTracking {
+  id          Int      @id @default(autoincrement())
+  productId   Int
+  product     Product  @relation(fields: [productId], references: [id])
+  regulation  String
+  trackingType String // batch, lot, serial, expiration, temperature
+  trackingId  String  // batch number, lot number, serial number
+  status      String   @default("active") // active, recalled, expired, disposed
+  expiryDate  DateTime?
+  recallDate  DateTime?
+  disposalDate DateTime?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// WORLD-CLASS ANALYTICS & BUSINESS INTELLIGENCE
+model InventoryAnalytics {
+  id          Int      @id @default(autoincrement())
+  productId   Int?
+  product     Product? @relation(fields: [productId], references: [id])
+  locationId  Int?
+  location    Location? @relation(fields: [locationId], references: [id])
+  metricType  String   // turnover, carrying_cost, service_level, stockout_rate
+  period      String   // daily, weekly, monthly, quarterly
+  periodStart DateTime
+  periodEnd   DateTime
+  value       Float
+  target      Float?
+  variance    Float?
+  insights    String?  // JSON insights and recommendations
+  createdAt   DateTime @default(now())
+}
+
+model InventoryAlert {
+  id          Int      @id @default(autoincrement())
+  productId   Int?
+  product     Product? @relation(fields: [productId], references: [id])
+  locationId  Int?
+  location    Location? @relation(fields: [locationId], references: [id])
+  alertType   String   // low_stock, overstock, expiration, quality, compliance
+  severity    String   // critical, high, medium, low
+  message     String
+  threshold   Float?
+  currentValue Float?
+  status      String   @default("active") // active, acknowledged, resolved
+  acknowledgedBy Int?
+  acknowledgedAt DateTime?
+  resolvedAt DateTime?
+  autoAction  String?  // JSON automated response
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// WORLD-CLASS SUPPLY CHAIN INTELLIGENCE
+model SupplierPerformance {
+  id          Int      @id @default(autoincrement())
+  supplierId  Int
+  supplier    Supplier @relation(fields: [supplierId], references: [id])
+  metricType  String   // on_time_delivery, quality_score, responsiveness, cost_variance
+  period      String   // monthly, quarterly, annually
+  periodStart DateTime
+  periodEnd   DateTime
+  score       Float    // 0-100 performance score
+  target      Float?
+  trend       String?  // improving, declining, stable
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model SupplyChainRisk {
+  id          Int      @id @default(autoincrement())
+  supplierId  Int?
+  supplier    Supplier? @relation(fields: [supplierId], references: [id])
+  productId   Int?
+  product     Product? @relation(fields: [productId], references: [id])
+  riskType    String   // supplier_reliability, geopolitical, natural_disaster, market_volatility
+  severity    String   // critical, high, medium, low
+  probability Float    // 0-1 probability score
+  impact      String   // high, medium, low
+  mitigation  String?  // mitigation strategy
+  status      String   @default("active") // active, mitigated, resolved
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Store Settings
+model StoreSettings {
+  id            Int         @id @default(autoincrement())
+  businessTypeId Int?
+  businessType  BusinessType? @relation(fields: [businessTypeId], references: [id])
+  storeName     String      @default("My POS Store")
+  currency      String      @default("USD")
+  timezone      String      @default("America/New_York")
+  taxRate       Float       @default(0)
+  address       String?
+  phone         String?
+  email         String?
+  logo          String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+// Table Assistance Requests
+model AssistanceRequest {
+  id            Int       @id @default(autoincrement())
+  tableId       Int
+  tableNumber   String
+  serverId      Int
+  serverName    String
+  assistanceType String    // cleanup, supplies, maintenance, etc.
+  priority      String    @default("normal") // urgent, important, normal
+  description   String
+  status        String    @default("pending") // pending, in_progress, completed, cancelled
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+// Notification System
+model Notification {
+  id            Int       @id @default(autoincrement())
+  type          String    // assistance_request, system, alert, order, etc.
+  title         String
+  message       String
+  priority      String    @default("normal") // urgent, important, normal, low
+  initiatedBy   String?   // name of person who initiated it
+  location      String?   // table number, department, etc.
+  read          Boolean   @default(false)
+  readAt        DateTime?
+  readBy        Int?      // user ID who read it
+  timestamp     DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+// ========== PHARMACY-SPECIFIC MODELS ========== //
+
+// Patient Medical Profiles for clinical decision support
+model PatientMedicalProfiles {
+  id             Int      @id @default(autoincrement())
+  patientId      Int
+  patient        Customer @relation(fields: [patientId], references: [id])
+
+  // Core medical information
+  allergies      String?  // JSON array of allergies with severity
+  currentMedications String? // JSON array of current medications with dosages
+  chronicConditions String? // JSON array of chronic conditions
+  pregnancyStatus Boolean  @default(false)
+  lactationStatus Boolean  @default(false)
+  smokingStatus   String?  // never, former, current
+  alcoholUse      String?  // none, occasional, moderate, heavy
+
+  // Vital signs (optional for emergency info)
+  heightCm        Float?
+  weightKg        Float?
+  bloodPressure   String?  // "120/80"
+  heartRate       Int?
+
+  // Care coordination
+  primaryCarePhysician String?
+  emergencyContact String? // JSON with name and phone
+
+  // Pharmacy preferences
+  preferredSubstitutions Boolean @default(true)
+  brandPreference String? // prefer_brand, prefer_generic, no_preference
+
+  // Compliance tracking
+  lastMedicationReview DateTime?
+  medicationAdherenceScore Float? // 0-100 calculated score
+  refillRemindersEnabled Boolean @default(true)
+
+  // Audit fields
+  createdBy       Int
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([patientId])
+}
+
+// Prescription Management
+model Prescriptions {
+  id               Int      @id @default(autoincrement())
+  prescriptionNumber String @unique // Pharmacy-generated prescription number
+
+  // Patient and prescriber info
+  patientId        Int
+  patient          Customer @relation(fields: [patientId], references: [id])
+  prescriberId     Int
+  prescriberName   String
+  prescriberDEA    String? // DEA number of prescriber
+  prescriberNPI    String? // National Provider Identifier
+
+  // Medication details
+  productId        Int
+  product          Product  @relation(fields: [productId], references: [id])
+  medicationName   String
+  genericName      String?
+  strength         String   // e.g., "500mg", "10mg/ml"
+  dosageForm       String   // tablet, capsule, liquid, etc.
+  route            String   // oral, topical, injection, etc.
+
+  // Prescription details
+  dosage           String   // e.g., "1 tablet daily", "2 capsules TID"
+  quantity         Float
+  daysSupply       Int
+  refillsRemaining Int      @default(0)
+  refillsAllowed   Int      @default(0)
+
+  // Dates
+  dateWritten      DateTime? // When prescription was written
+  dateFilled       DateTime? // When originally filled
+  expirationDate   DateTime? // When prescription expires
+
+  // Status tracking
+  status           String   @default("pending") // active, completed, expired, discontinued, cancelled
+  fillStatus       String   @default("not_filled") // not_filled, partial, filled, expired
+
+  // Scanned prescription document
+  scannedImagePath String?
+  prescriptionNotes String?
+
+  // Pharmacy workflow
+  requiresPharmacistReview Boolean @default(true)
+  pharmacistId      Int?
+  pharmacistNotes   String?
+  filledBy          Int?
+  checkedBy         Int?
+  counselledBy      Int?
+
+  // Audit and compliance
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  createdBy         Int
+
+  // Relations
+  fills             PrescriptionFills[]
+  controlledSubstanceLogs ControlledSubstanceLog[]
+
+  @@index([patientId, status])
+  @@index([dateFilled])
+}
+
+// Individual prescription fills (for tracking partial fills and refills)
+model PrescriptionFills {
+  id               Int      @id @default(autoincrement())
+  prescriptionId   Int
+  prescription     Prescriptions @relation(fields: [prescriptionId], references: [id])
+
+  // Fill details
+  fillNumber       Int      @default(1)
+  quantityFilled   Float
+  daysSupply       Int
+  fillDate         DateTime @default(now())
+  filledBy         Int
+
+  // Pricing and payment
+  cost             Float
+  copay            Float
+  insurancePaid    Float?
+  patientPaid      Float
+
+  // Pharmacy workflow
+  checkedBy        Int?
+  counselledBy     Int?
+
+  // Notes and special instructions
+  pharmacistNotes  String?
+  patientNotes     String?
+
+  // Relations - SaleItem linkage handled via foreign key field when needed
+
+  createdAt        DateTime @default(now())
+
+  @@index([prescriptionId, fillNumber])
+}
+
+// Controlled Substances WORM Audit Log (immutable)
+model ControlledSubstanceLog {
+  id                  Int      @id @default(autoincrement())
+
+  // Link to prescription and fill
+  prescriptionFillId  Int?     // Links to PrescriptionFills if applicable
+  prescriptionId      Int?
+  prescription        Prescriptions? @relation(fields: [prescriptionId], references: [id])
+
+  // Controlled substance details
+  deaNumber           String?  // Pharmacy's DEA registration number
+  schedule            String   // I, II, III, IV, V
+  drugName            String
+  strength            String
+  dosageForm          String
+  quantityDispensed   Float
+  quantityReceived    Float?   // For purchase receipts
+
+  // Required signatures (digital storage paths)
+  patientSignaturePath String?
+  pharmacistSignaturePath String
+  witnessSignaturePath String?
+
+  // Patient and prescriber identification
+  patientId           Int
+  patientName         String
+  patientDOB          DateTime?
+  prescriberName      String
+  prescriberDEA       String?
+
+  // Transaction details
+  transactionType     String   // dispensing, receiving, disposal, transfer
+  transactionDate     DateTime @default(now())
+  location            String   // Pharmacy location/branch
+
+  // Compliance fields
+  purposeOfUse       String?  // medical, research, etc.
+  administrationRoute String?
+  lotNumber          String?
+  expirationDate     DateTime?
+
+  // WORM AUDIT FIELDS (immutable after creation)
+  createdBy          Int      // User who performed the action
+  createdAt          DateTime @default(now()) // Never updated - WORM
+  checksum           String   // SHA-256 hash of all fields for integrity verification
+
+  // Disposal tracking (if applicable)
+  disposition        String?  // dispensed, destroyed, returned, stolen, etc.
+  disposalMethod     String?  // returned_to_stock, waste_destruction, etc.
+  disposalWitness    Int?     // Witness user ID
+  disposalDate       DateTime?
+
+  // Relations
+  // pharmacy           User?    @db("createdBy") // Related via createdBy field directly
+
+  @@index([prescriptionId])
+  @@index([schedule, transactionDate])
+  @@index([patientId, transactionDate])
+}
+
+// Pharmacist Verifications (for clinical overrides)
+model PharmacistVerifications {
+  id                 Int      @id @default(autoincrement())
+
+  // What was verified/overridden
+  entityType         String   // prescription, allergy_alert, drug_interaction, etc.
+  entityId           Int      // ID of the entity being verified
+  verificationType   String   // approval, override, review_required
+
+  // Pharmacist details
+  pharmacistId       Int
+  pharmacistName     String
+  pharmacistLicense  String?  // State license number
+  pharmacistDEA      String?
+
+  // Clinical justification
+  clinicalReason     String   // Why approval/override was needed
+  alternativeTherapy String?  // Suggested alternatives if applicable
+
+  // System-generated details
+  triggeredAlerts    String?  // JSON of alerts that triggered this verification
+  riskLevel          String   @default("medium") // critical, high, medium, low
+
+  // Audit trail
+  verifiedAt         DateTime @default(now())
+  ipAddress          String?
+  terminalId         String?
+
+  // Relations
+  logEntry           Log? @relation(fields: [logEntryId], references: [id])
+  logEntryId         Int?
+
+  createdAt          DateTime @default(now())
+
+  @@index([pharmacistId, verifiedAt])
+  @@index([entityType, entityId])
+}

@@ -1,0 +1,38 @@
+sequenceDiagram
+    participant U as User (Cashier/Staff)
+    participant FE as Frontend (POS/CRM UI)
+    participant BE as Backend (Express API)
+    participant INV as Inventory Engine
+    participant DB as Database
+
+    U->>FE: Initiates Sale (scan/add item)
+    FE->>BE: POST /sale { productId, qty, userId, JWT }
+    BE->>BE: authMiddleware → extract businessType from JWT
+    BE->>INV: inventoryWorkflowMiddleware(businessType)
+
+    alt Pharmacy Sale
+        INV->>DB: Deduct stock by Batch + Expiry
+        INV->>DB: Log Prescription Validation
+        INV-->>BE: Trigger Expiry Alerts if needed
+    end
+
+    alt Restaurant Sale
+        INV->>DB: Deduct Ingredients via Recipe Mapping
+        INV->>DB: Forecast Ingredient Runout
+        INV-->>BE: Trigger Low Stock Alerts
+    end
+
+    alt Rental Sale
+        INV->>DB: Mark Asset as Out-of-Stock
+        INV->>DB: Create Rental Contract (start/end dates)
+        INV-->>BE: Schedule Overdue Alert
+    end
+
+    alt Retail Sale
+        INV->>DB: Deduct Stock by SKU Variant
+        INV->>DB: Register Warranty (if applicable)
+        INV-->>BE: Allow Return/Exchange Workflow
+    end
+
+    BE-->>FE: Sale Confirmation + Tailored Workflow Applied
+    FE-->>U: Show Success (pharmacy = Rx validated, restaurant = recipe deducted, etc.)
