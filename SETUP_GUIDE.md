@@ -50,7 +50,23 @@ cd POS_FINAL
 ls -la  # Should see prisma/, src/, package.json, etc.
 ```
 
-### **Step 2: Install Dependencies**
+### **Step 2: Set Up Environment Variables**
+```bash
+# Copy the example environment file
+cp .env.example .env
+
+# Generate secure JWT secrets (CRITICAL FOR SECURITY)
+node -e "console.log('JWT_SECRET=' + require('crypto').randomBytes(64).toString('hex'))"
+node -e "console.log('JWT_REFRESH_SECRET=' + require('crypto').randomBytes(64).toString('hex'))"
+
+# Edit .env file and replace the generated secrets:
+JWT_SECRET=your_generated_secret_here
+JWT_REFRESH_SECRET=your_generated_secret_here
+```
+
+**Security Warning:** Never reuse JWT secrets across different deployments!
+
+### **Step 3: Install Dependencies**
 ```bash
 # Install all required packages
 npm install
